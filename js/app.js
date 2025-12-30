@@ -5,6 +5,7 @@ class CosmicResonanceApp {
         this.currentSection = 'welcome';
         this.starField3D = null;
         this.backgroundStarfield = null;
+        this.gestureController = null;
         this.soundEnabled = true;
         this.isFullscreen = false;
         
@@ -68,12 +69,21 @@ class CosmicResonanceApp {
     }
 
     initializeComponents() {
-        // 初始化3D星空（延迟加载）
+        // 初始化3D星空（延迟加载，确保DOM已准备好）
         setTimeout(() => {
-            if (document.getElementById('starfield-canvas')) {
-                this.starField3D = new StarField3D('starfield-canvas');
+            const canvas = document.getElementById('starfield-canvas');
+            if (canvas) {
+                console.log('找到星空画布，开始初始化...');
+                try {
+                    this.starField3D = new StarField3D('starfield-canvas');
+                    console.log('星空场景创建成功');
+                } catch (error) {
+                    console.error('星空场景创建失败:', error);
+                }
+            } else {
+                console.warn('未找到星空画布元素');
             }
-        }, 2000);
+        }, 1000);
     }
 
     setupEventListeners() {
@@ -136,6 +146,34 @@ class CosmicResonanceApp {
         document.addEventListener('visibilitychange', () => {
             this.handleVisibilityChange();
         });
+
+        // 启用手势控制按钮（使用事件委托，确保元素存在时能绑定）
+        document.addEventListener('click', (event) => {
+            // 检查点击的是按钮本身或按钮内的元素
+            const target = event.target;
+            if (target && (target.id === 'enable-gesture' || target.closest('#enable-gesture'))) {
+                event.preventDefault();
+                event.stopPropagation();
+                console.log('手势控制按钮被点击');
+                this.enableGestureControl();
+            }
+        });
+        
+        // 也尝试直接绑定（延迟绑定，确保元素已存在）
+        setTimeout(() => {
+            const enableGestureBtn = document.getElementById('enable-gesture');
+            if (enableGestureBtn) {
+                console.log('找到手势控制按钮，直接绑定事件');
+                enableGestureBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    console.log('手势控制按钮被点击（直接绑定）');
+                    this.enableGestureControl();
+                });
+            } else {
+                console.warn('未找到手势控制按钮');
+            }
+        }, 2000);
     }
 
     setupCustomCursor() {
@@ -365,6 +403,15 @@ class CosmicResonanceApp {
     }
 
     handleKeyboardShortcuts(event) {
+        // 如果用户在输入框或文本框中输入，不处理快捷键
+        const isInputFocused = event.target.tagName === 'INPUT' || 
+                               event.target.tagName === 'TEXTAREA' ||
+                               event.target.isContentEditable;
+        
+        if (isInputFocused) {
+            return; // 在输入框中输入时，不处理快捷键
+        }
+        
         // ESC键退出全屏
         if (event.key === 'Escape' && this.isFullscreen) {
             this.toggleFullscreen();
@@ -376,7 +423,7 @@ class CosmicResonanceApp {
             this.toggleSound();
         }
         
-        // 数字键快速导航
+        // 数字键快速导航（仅在非输入状态下）
         const sectionMap = {
             '1': 'welcome',
             '2': 'starfield',
@@ -454,6 +501,74 @@ class CosmicResonanceApp {
         // 减少粒子数量
         if (this.backgroundStarfield) {
             this.backgroundStarfield.reduceDensity();
+        }
+    }
+
+    // 启用手势控制
+    enableGestureControl() {
+        console.log('enableGestureControl 被调用');
+        console.log('starField3D:', this.starField3D);
+        console.log('当前section:', this.currentSection);
+        
+        if (!this.starField3D) {
+            console.warn('星空未加载完成');
+            this.showGuidanceMessage('请先等待星空加载完成');
+            return;
+        }
+
+        if (this.gestureController) {
+            // 如果已经启用，则关闭
+            console.log('关闭手势控制，清理资源...');
+            this.gestureController.stop();
+            this.gestureController = null;
+            
+            // 确保清理所有遗留元素
+            const videoContainers = document.querySelectorAll('.gesture-video-container');
+            videoContainers.forEach(container => container.remove());
+            
+            const btn = document.getElementById('enable-gesture');
+            if (btn) {
+                btn.textContent = '启用手势控制';
+                btn.style.background = 'var(--gradient-primary)';
+            }
+            this.showGuidanceMessage('手势控制已关闭');
+            return;
+        }
+
+        // 创建手势控制器
+        try {
+            console.log('正在启用手势控制...');
+            console.log('星空场景对象:', this.starField3D);
+            console.log('星空场景位置:', this.starField3D ? this.starField3D.scene.position : 'N/A');
+            
+            if (!this.starField3D || !this.starField3D.scene) {
+                this.showGuidanceMessage('星空场景未加载，请稍候再试');
+                return;
+            }
+            
+            this.gestureController = new GestureController(this.starField3D);
+            const btn = document.getElementById('enable-gesture');
+            if (btn) {
+                btn.textContent = '关闭手势控制';
+                btn.style.background = 'rgba(239, 68, 68, 0.8)';
+            }
+            this.showGuidanceMessage('手势控制已启动：左右摆手移动星空，两指缩放');
+        } catch (error) {
+            console.error('启用手势控制失败:', error);
+            // 尝试使用简化版本
+            try {
+                console.log('尝试使用简化模式...');
+                this.gestureController = new SimpleGestureController(this.starField3D);
+                const btn = document.getElementById('enable-gesture');
+                if (btn) {
+                    btn.textContent = '关闭手势控制';
+                    btn.style.background = 'rgba(239, 68, 68, 0.8)';
+                }
+                this.showGuidanceMessage('使用基础手势模式');
+            } catch (e) {
+                console.error('简化模式也失败:', e);
+                this.showGuidanceMessage('手势控制启动失败: ' + e.message);
+            }
         }
     }
 

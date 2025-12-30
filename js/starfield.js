@@ -2,9 +2,43 @@
 class StarField3D {
     constructor(canvasId) {
         this.canvas = document.getElementById(canvasId);
+        if (!this.canvas) {
+            console.error('Canvas element not found:', canvasId);
+            return;
+        }
+        
+        // 检查 Three.js 是否加载
+        if (typeof THREE === 'undefined') {
+            console.error('Three.js 未加载！请检查 CDN 链接');
+            alert('Three.js 库加载失败，请检查网络连接');
+            return;
+        }
+        
+        console.log('Three.js 版本:', THREE.REVISION);
+        console.log('Canvas 元素:', this.canvas);
+        console.log('Canvas 尺寸:', this.canvas.clientWidth, 'x', this.canvas.clientHeight);
+        
         this.scene = new THREE.Scene();
-        this.camera = new THREE.PerspectiveCamera(75, this.canvas.clientWidth / this.canvas.clientHeight, 0.1, 1000);
-        this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, alpha: true });
+        
+        // 确保有有效的宽高
+        const width = this.canvas.clientWidth || 800;
+        const height = this.canvas.clientHeight || 600;
+        
+        if (width === 0 || height === 0) {
+            console.warn('Canvas 尺寸为 0，等待尺寸更新...');
+            setTimeout(() => {
+                this.initWithRetry();
+            }, 500);
+            return;
+        }
+        
+        this.camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
+        this.renderer = new THREE.WebGLRenderer({ 
+            canvas: this.canvas, 
+            alpha: false, // 不透明，使用黑色背景
+            antialias: true, // 抗锯齿
+            powerPreference: "high-performance" // 高性能模式
+        });
         
         this.stars = [];
         this.constellations = [];
@@ -15,65 +49,121 @@ class StarField3D {
         this.init();
         this.setupEventListeners();
         this.animate();
+        
+        console.log('星空场景初始化完成');
+    }
+    
+    initWithRetry() {
+        const width = this.canvas.clientWidth || 800;
+        const height = this.canvas.clientHeight || 600;
+        this.camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
+        this.renderer = new THREE.WebGLRenderer({ 
+            canvas: this.canvas, 
+            alpha: false,
+            antialias: true,
+            powerPreference: "high-performance"
+        });
+        this.init();
+        this.setupEventListeners();
+        this.animate();
     }
 
     init() {
+        console.log('初始化星空场景...');
+        const width = this.canvas.clientWidth || 800;
+        const height = this.canvas.clientHeight || 600;
+        console.log('Canvas尺寸:', width, 'x', height);
+        
         // 设置渲染器
-        this.renderer.setSize(this.canvas.clientWidth, this.canvas.clientHeight);
-        this.renderer.setClearColor(0x000000, 0);
+        this.renderer.setSize(width, height);
+        this.renderer.setClearColor(0x000000, 1); // 纯黑背景，突出星星
+        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // 高DPI支持，限制最大2倍
         
         // 设置相机位置
         this.camera.position.z = 5;
+        this.camera.aspect = width / height;
+        this.camera.updateProjectionMatrix();
         
-        // 创建星空
+        // 初始化场景位置和旋转为0（确保完全静态）
+        this.scene.position.set(0, 0, 0);
+        this.scene.rotation.set(0, 0, 0);
+        
+        console.log('创建星空粒子...');
+        // 创建简洁的白色星星
         this.createStarField();
+        
+        console.log('创建星座...');
         this.createConstellations();
         
-        // 添加环境光
-        const ambientLight = new THREE.AmbientLight(0x404040, 0.4);
+        // 只添加必要的环境光（用于星座的 MeshStandardMaterial）
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
         this.scene.add(ambientLight);
         
-        // 添加点光源
-        const pointLight = new THREE.PointLight(0xffffff, 1, 100);
-        pointLight.position.set(10, 10, 10);
-        this.scene.add(pointLight);
+        console.log('星空场景初始化完成，星星数量:', this.stars.length);
+        console.log('场景对象数量:', this.scene.children.length);
+        
+        // 立即渲染一次，确保可见
+        this.renderer.render(this.scene, this.camera);
+        console.log('首次渲染完成');
     }
-
+    
     createStarField() {
+        // 创建圆形星星纹理
+        const createStarTexture = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = 64;
+            canvas.height = 64;
+            const ctx = canvas.getContext('2d');
+            
+            // 创建径向渐变，中心亮，边缘透明
+            const gradient = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+            gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
+            gradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.8)');
+            gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+            
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, 64, 64);
+            
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.needsUpdate = true;
+            return texture;
+        };
+        
+        // 创建简洁的白色星星点
+        const starCount = 2000; // 星星数量
+        const starRange = 50; // 星星分布范围
+        
         const starGeometry = new THREE.BufferGeometry();
-        const starCount = 1000;
         const positions = new Float32Array(starCount * 3);
-        const colors = new Float32Array(starCount * 3);
         
         for (let i = 0; i < starCount; i++) {
             const i3 = i * 3;
             
             // 随机位置
-            positions[i3] = (Math.random() - 0.5) * 20;
-            positions[i3 + 1] = (Math.random() - 0.5) * 20;
-            positions[i3 + 2] = (Math.random() - 0.5) * 20;
-            
-            // 随机颜色（偏白色和蓝色）
-            const color = new THREE.Color();
-            color.setHSL(Math.random() * 0.2 + 0.5, 0.3, Math.random() * 0.5 + 0.5);
-            colors[i3] = color.r;
-            colors[i3 + 1] = color.g;
-            colors[i3 + 2] = color.b;
+            positions[i3] = (Math.random() - 0.5) * starRange;
+            positions[i3 + 1] = (Math.random() - 0.5) * starRange;
+            positions[i3 + 2] = (Math.random() - 0.5) * starRange;
         }
         
         starGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-        starGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
         
+        // 白色星星材质，使用圆形纹理
         const starMaterial = new THREE.PointsMaterial({
-            size: 2,
-            vertexColors: true,
+            color: 0xffffff, // 纯白色
+            size: 2, // 星星大小
+            map: createStarTexture(), // 使用圆形纹理
             transparent: true,
-            opacity: 0.8
+            opacity: 0.9,
+            sizeAttenuation: true,
+            depthWrite: false,
+            alphaTest: 0.1 // 优化透明渲染
         });
         
         const stars = new THREE.Points(starGeometry, starMaterial);
         this.scene.add(stars);
         this.stars.push(stars);
+        
+        console.log('白色圆形星星创建完成，数量:', starCount);
     }
 
     createConstellations() {
@@ -105,8 +195,96 @@ class StarField3D {
             ]
         };
 
+        // 仙后座（W形状）
+        const cassiopeia = {
+            name: '仙后座',
+            description: '北天星座，形状像字母W或M，代表希腊神话中的仙后卡西俄珀亚。',
+            stars: [
+                { name: '王良一', position: [-1, 3, -1], brightness: 1.2 },
+                { name: '王良二', position: [-0.5, 2.8, -1], brightness: 1.1 },
+                { name: '策', position: [0, 2.5, -1], brightness: 1.3 },
+                { name: '阁道三', position: [0.5, 2.8, -1], brightness: 1.1 },
+                { name: '阁道二', position: [1, 3, -1], brightness: 1.2 }
+            ]
+        };
+
+        // 天鹅座（十字形）
+        const cygnus = {
+            name: '天鹅座',
+            description: '北天星座，形状像展翅的天鹅，也被称为"北十字"。',
+            stars: [
+                { name: '天津四', position: [0, 2, 1], brightness: 1.4 },
+                { name: '天津一', position: [-0.8, 1.5, 1], brightness: 1.1 },
+                { name: '天津二', position: [0.8, 1.5, 1], brightness: 1.1 },
+                { name: '天津九', position: [-0.4, 0.5, 1], brightness: 1.0 },
+                { name: '天津八', position: [0.4, 0.5, 1], brightness: 1.0 },
+                { name: '辇道增七', position: [0, -0.5, 1], brightness: 1.2 }
+            ]
+        };
+
+        // 天鹰座（鹰形）
+        const aquila = {
+            name: '天鹰座',
+            description: '赤道带星座，形状像展翅的雄鹰，其中最亮的是牛郎星（河鼓二）。',
+            stars: [
+                { name: '河鼓二', position: [2.5, -1, 0.5], brightness: 1.5 },
+                { name: '河鼓一', position: [2, -1.5, 0.5], brightness: 1.1 },
+                { name: '河鼓三', position: [3, -1.5, 0.5], brightness: 1.1 },
+                { name: '天市左垣一', position: [2.2, -0.5, 0.5], brightness: 1.0 },
+                { name: '天市左垣二', position: [2.8, -0.5, 0.5], brightness: 1.0 }
+            ]
+        };
+
+        // 狮子座（狮子形状）
+        const leo = {
+            name: '狮子座',
+            description: '黄道星座，形状像一头狮子，代表希腊神话中的涅墨亚狮子。',
+            stars: [
+                { name: '轩辕十四', position: [-2.5, -1.5, -0.5], brightness: 1.4 },
+                { name: '轩辕十二', position: [-2, -2, -0.5], brightness: 1.2 },
+                { name: '轩辕九', position: [-1.5, -1.8, -0.5], brightness: 1.1 },
+                { name: '轩辕十一', position: [-3, -1.8, -0.5], brightness: 1.1 },
+                { name: '五帝座一', position: [-2.2, -0.8, -0.5], brightness: 1.3 }
+            ]
+        };
+
+        // 天蝎座（蝎子形状）
+        const scorpius = {
+            name: '天蝎座',
+            description: '黄道星座，形状像一只蝎子，代表希腊神话中杀死猎户座的毒蝎。',
+            stars: [
+                { name: '心宿二', position: [1.5, -2.5, -1], brightness: 1.5 },
+                { name: '心宿一', position: [1, -2.8, -1], brightness: 1.2 },
+                { name: '心宿三', position: [2, -2.8, -1], brightness: 1.2 },
+                { name: '房宿一', position: [1.2, -2, -1], brightness: 1.1 },
+                { name: '房宿二', position: [1.8, -2, -1], brightness: 1.1 },
+                { name: '尾宿一', position: [1.5, -3, -1], brightness: 1.0 }
+            ]
+        };
+
+        // 小熊座（小北斗）
+        const ursaMinor = {
+            name: '小熊座',
+            description: '北天星座，形状像小勺子，包含北极星（勾陈一），是导航的重要星座。',
+            stars: [
+                { name: '勾陈一', position: [0, 3.5, 0], brightness: 1.6 },
+                { name: '勾陈二', position: [-0.3, 3.2, 0], brightness: 1.2 },
+                { name: '勾陈三', position: [-0.6, 2.9, 0], brightness: 1.1 },
+                { name: '勾陈四', position: [-0.4, 2.5, 0], brightness: 1.0 },
+                { name: '勾陈五', position: [0.2, 2.8, 0], brightness: 1.1 },
+                { name: '勾陈六', position: [0.5, 3.1, 0], brightness: 1.0 },
+                { name: '勾陈七', position: [0.3, 3.4, 0], brightness: 1.0 }
+            ]
+        };
+
         this.createConstellation(bigDipper);
         this.createConstellation(orion);
+        this.createConstellation(cassiopeia);
+        this.createConstellation(cygnus);
+        this.createConstellation(aquila);
+        this.createConstellation(leo);
+        this.createConstellation(scorpius);
+        this.createConstellation(ursaMinor);
     }
 
     createConstellation(constellationData) {
@@ -115,11 +293,14 @@ class StarField3D {
         
         // 创建星星
         constellationData.stars.forEach((starData, index) => {
-            const starGeometry = new THREE.SphereGeometry(0.02 * starData.brightness, 8, 8);
-            const starMaterial = new THREE.MeshBasicMaterial({
+            const starGeometry = new THREE.SphereGeometry(0.08 * starData.brightness, 16, 16); // 增大星座星星
+            // 使用 MeshStandardMaterial 支持自发光
+            const starMaterial = new THREE.MeshStandardMaterial({
                 color: 0xffffff,
                 transparent: true,
-                opacity: 0.9
+                opacity: 1, // 增加亮度
+                emissive: 0xffffff, // 添加自发光
+                emissiveIntensity: 1.0 // 增强发光强度
             });
             
             const star = new THREE.Mesh(starGeometry, starMaterial);
@@ -131,11 +312,13 @@ class StarField3D {
             };
             
             // 添加发光效果
-            const glowGeometry = new THREE.SphereGeometry(0.05 * starData.brightness, 8, 8);
-            const glowMaterial = new THREE.MeshBasicMaterial({
+            const glowGeometry = new THREE.SphereGeometry(0.12 * starData.brightness, 16, 16);
+            const glowMaterial = new THREE.MeshStandardMaterial({
                 color: 0x6366f1,
                 transparent: true,
-                opacity: 0.3
+                opacity: 0.6,
+                emissive: 0x6366f1,
+                emissiveIntensity: 0.5
             });
             const glow = new THREE.Mesh(glowGeometry, glowMaterial);
             star.add(glow);
@@ -161,7 +344,7 @@ class StarField3D {
             const lineMaterial = new THREE.LineBasicMaterial({
                 color: 0x6366f1,
                 transparent: true,
-                opacity: 0.5
+                opacity: 0.7
             });
             
             const line = new THREE.Line(lineGeometry, lineMaterial);
@@ -193,9 +376,13 @@ class StarField3D {
                     y: event.offsetY - previousMousePosition.y
                 };
                 
-                // 旋转场景
-                this.scene.rotation.y += deltaMove.x * 0.01;
-                this.scene.rotation.x += deltaMove.y * 0.01;
+                // 平移场景（而不是旋转），与手势控制保持一致
+                this.scene.position.x += deltaMove.x * 0.05;
+                this.scene.position.y -= deltaMove.y * 0.05;
+                
+                // 限制移动范围
+                this.scene.position.x = Math.max(-20, Math.min(20, this.scene.position.x));
+                this.scene.position.y = Math.max(-20, Math.min(20, this.scene.position.y));
             }
             
             previousMousePosition = {
@@ -315,42 +502,46 @@ class StarField3D {
     animate() {
         requestAnimationFrame(() => this.animate());
         
-        // 自动旋转（当不在交互时）
-        if (!this.isInteracting) {
-            this.scene.rotation.y += 0.001;
-        }
+        // 完全停止自动旋转，保持静态（等待手势控制）
+        // 不进行任何自动旋转
         
-        // 星星闪烁效果
-        this.stars.forEach(starGroup => {
-            if (starGroup.material) {
-                starGroup.material.opacity = 0.6 + Math.sin(Date.now() * 0.001) * 0.2;
+        // 简单的星星闪烁效果
+        this.stars.forEach((starGroup) => {
+            if (starGroup && starGroup.material) {
+                // 轻微的闪烁效果
+                starGroup.material.opacity = 0.7 + Math.sin(Date.now() * 0.001) * 0.2;
             }
         });
         
         // 星座发光效果
         this.constellations.forEach(constellation => {
-            constellation.children.forEach(child => {
-                if (child.children.length > 0) {
-                    const glow = child.children[0];
-                    if (glow && glow.material) {
-                        glow.material.opacity = 0.2 + Math.sin(Date.now() * 0.002 + child.position.x) * 0.1;
+            if (constellation && constellation.children) {
+                constellation.children.forEach(child => {
+                    if (child && child.children && child.children.length > 0) {
+                        const glow = child.children[0];
+                        if (glow && glow.material) {
+                            glow.material.opacity = 0.5 + Math.sin(Date.now() * 0.0015 + child.position.x) * 0.25;
+                        }
                     }
-                }
-            });
+                });
+            }
         });
         
+        // 确保渲染（无论是否有交互都要渲染）
         this.renderer.render(this.scene, this.camera);
     }
 
     onWindowResize() {
         const rect = this.canvas.getBoundingClientRect();
-        this.camera.aspect = rect.width / rect.height;
-        this.camera.updateProjectionMatrix();
-        this.renderer.setSize(rect.width, rect.height);
+        if (rect.width > 0 && rect.height > 0) {
+            this.camera.aspect = rect.width / rect.height;
+            this.camera.updateProjectionMatrix();
+            this.renderer.setSize(rect.width, rect.height);
+        }
     }
 
     resetView() {
-        // 重置相机位置和场景旋转
+        // 重置相机位置、场景旋转和位置
         gsap.to(this.camera.position, {
             duration: 1,
             z: 5,
@@ -358,6 +549,15 @@ class StarField3D {
         });
         
         gsap.to(this.scene.rotation, {
+            duration: 1,
+            x: 0,
+            y: 0,
+            z: 0,
+            ease: "power2.out"
+        });
+        
+        // 重置场景位置（手势控制后的平移）
+        gsap.to(this.scene.position, {
             duration: 1,
             x: 0,
             y: 0,
@@ -513,4 +713,3 @@ style.textContent = `
     }
 `;
 document.head.appendChild(style);
-

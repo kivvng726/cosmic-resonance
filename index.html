@@ -77,18 +77,22 @@
 
         <!-- 星空操控区域 -->
         <section id="starfield-section" class="section">
-            <div class="section-header">
-                <h2>星空操控体验</h2>
-                <p>使用鼠标拖拽旋转星空，滚轮缩放，点击星座了解详情</p>
+            <div class="starfield-left-panel">
+                <div class="section-header">
+                    <h2>星空操控体验</h2>
+                    <p>使用鼠标拖拽旋转星空，滚轮缩放，点击星座了解详情</p>
+                </div>
+                
+                <div class="gesture-hint">
+                    <div class="gesture-icon">👋</div>
+                    <p>手势控制：左右摆手移动星空，两指缩放</p>
+                    <button id="enable-gesture" class="gesture-btn">启用手势控制</button>
+                </div>
             </div>
             
             <div class="starfield-container">
                 <canvas id="starfield-canvas"></canvas>
                 <div class="starfield-ui">
-                    <div class="gesture-hint">
-                        <div class="gesture-icon">👋</div>
-                        <p>挥手启动占星术</p>
-                    </div>
                     <div class="constellation-info" id="constellation-info">
                         <h3 id="constellation-name"></h3>
                         <p id="constellation-desc"></p>
@@ -252,6 +256,7 @@
 
     <!-- JavaScript -->
     <script src="js/starfield.js"></script>
+    <script src="js/gesture.js"></script>
     <script src="js/voice.js"></script>
     <script src="js/divination.js"></script>
     <script src="js/app.js"></script>

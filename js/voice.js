@@ -283,7 +283,10 @@ class TextToSpeechSimulator {
         };
 
         this.currentUtterance.onerror = (event) => {
-            console.error('语音播报错误:', event.error);
+            // 如果是用户主动中断，不显示错误
+            if (event.error !== 'interrupted') {
+                console.error('语音播报错误:', event.error);
+            }
             this.onSpeechEnd();
         };
 
@@ -291,8 +294,11 @@ class TextToSpeechSimulator {
     }
 
     stop() {
-        if (this.isSupported && speechSynthesis.speaking) {
+        if (this.isSupported) {
+            // 停止所有语音合成，包括正在播放和排队的
             speechSynthesis.cancel();
+            // 停止后更新按钮状态
+            this.onSpeechEnd();
         }
     }
 

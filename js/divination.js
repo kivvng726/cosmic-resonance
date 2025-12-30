@@ -79,7 +79,14 @@ class DivinationEngine {
         const audioBtn = document.getElementById('play-audio');
         if (audioBtn) {
             audioBtn.addEventListener('click', () => {
-                this.playAudioReading();
+                // 检查是否正在播报
+                if (audioBtn.classList.contains('playing')) {
+                    // 如果正在播报，停止播报
+                    this.stopAudioReading();
+                } else {
+                    // 如果没有播报，开始播报
+                    this.playAudioReading();
+                }
             });
         }
 
@@ -321,6 +328,12 @@ class DivinationEngine {
                 pitch: 1.1,
                 volume: 0.9
             });
+        }
+    }
+
+    stopAudioReading() {
+        if (textToSpeechSimulator) {
+            textToSpeechSimulator.stop();
         }
     }
 

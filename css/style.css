@@ -185,6 +185,7 @@ body::after {
     min-height: 100vh;
     padding: 6rem 2rem 2rem;
     display: none;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
 }
@@ -193,9 +194,34 @@ body::after {
     display: flex;
 }
 
+/* 星空页面特殊布局：左右结构 */
+#starfield-section {
+    flex-direction: row;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 2rem;
+}
+
+/* 左侧面板（标题+手势控制） */
+.starfield-left-panel {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2rem;
+    min-width: 300px;
+    max-width: 350px;
+}
+
 .section-header {
     text-align: center;
     margin-bottom: 3rem;
+    width: 100%;
+}
+
+/* 星空页面的section-header特殊样式 */
+#starfield-section .section-header {
+    margin-bottom: 0;
+    width: 100%;
 }
 
 .section-header h2 {
@@ -324,7 +350,10 @@ body::after {
     border-radius: 20px;
     overflow: hidden;
     border: 1px solid var(--glass-border);
-    background: var(--bg-darker);
+    background: #000000;
+    box-shadow: 0 0 50px rgba(102, 102, 241, 0.3);
+    /* 确保星空可见 */
+    min-height: 600px;
 }
 
 #starfield-canvas {
@@ -346,16 +375,73 @@ body::after {
     pointer-events: none;
 }
 
+/* 允许手势控制按钮接收点击事件 */
+.gesture-hint,
+.gesture-btn {
+    pointer-events: auto !important;
+}
+
+.gesture-btn {
+    background: var(--gradient-primary);
+    border: none;
+    color: white;
+    padding: 0.6rem 1.2rem;
+    border-radius: 25px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.3s ease;
+    margin-top: 0.5rem;
+    font-weight: 500;
+    box-shadow: 0 4px 15px rgba(102, 102, 241, 0.3);
+}
+
+.gesture-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(102, 102, 241, 0.4);
+}
+
+.gesture-btn:active {
+    transform: translateY(0);
+}
+
 .gesture-hint {
-    position: absolute;
-    top: 20px;
-    left: 20px;
+    position: relative;
+    width: 100%;
+    margin: 0;
     background: var(--glass-bg);
     border: 1px solid var(--glass-border);
     border-radius: 10px;
     padding: 1rem;
     text-align: center;
     backdrop-filter: blur(10px);
+}
+
+.gesture-video-container {
+    position: relative;
+    width: 100%;
+    height: 200px;
+    margin-top: 1rem;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #000;
+    border: 1px solid rgba(102, 102, 241, 0.3);
+}
+
+.gesture-video-container video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transform: scaleX(-1);
+}
+
+.gesture-video-container canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 10;
 }
 
 .gesture-icon {
@@ -425,6 +511,46 @@ body::after {
     outline: none;
     border-color: var(--primary-color);
     box-shadow: 0 0 0 3px rgba(102, 102, 241, 0.2);
+}
+
+/* 日期和时间选择器图标改为白色 */
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+    cursor: pointer;
+    opacity: 1;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator:hover,
+input[type="time"]::-webkit-calendar-picker-indicator:hover {
+    filter: invert(1) brightness(1.2);
+    opacity: 1;
+}
+
+/* 针对特定输入框 */
+#birth-date::-webkit-calendar-picker-indicator,
+#birth-time::-webkit-calendar-picker-indicator {
+    filter: invert(1) !important;
+    opacity: 1 !important;
+    cursor: pointer !important;
+}
+
+#birth-date::-webkit-calendar-picker-indicator:hover,
+#birth-time::-webkit-calendar-picker-indicator:hover {
+    filter: invert(1) brightness(1.2) !important;
+}
+
+/* Firefox 日期时间选择器图标 */
+input[type="date"],
+input[type="time"] {
+    color-scheme: dark;
+}
+
+/* 时间选择器的上下箭头 */
+input[type="time"]::-webkit-inner-spin-button,
+input[type="time"]::-webkit-outer-spin-button {
+    filter: invert(1);
+    opacity: 1;
 }
 
 .voice-input-group {
