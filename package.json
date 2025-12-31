@@ -1,0 +1,9 @@
+{
+  "name": "cosmic-resonance",
+  "version": "1.0.0",
+  "description": "沉浸式星象互动占卜装置",
+  "scripts": {
+    "build": "echo 'No build step required for static site'"
+  }
+}
+
