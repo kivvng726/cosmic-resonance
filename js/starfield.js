@@ -78,6 +78,13 @@ class StarField3D {
         this.renderer.setSize(width, height);
         this.renderer.setClearColor(0x000000, 1); // 纯黑背景，突出星星
         this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // 高DPI支持，限制最大2倍
+        // 确保输出编码正确，避免颜色失真（r128版本使用outputEncoding）
+        if (this.renderer.outputEncoding !== undefined) {
+            this.renderer.outputEncoding = THREE.sRGBEncoding;
+        }
+        if (this.renderer.toneMapping !== undefined) {
+            this.renderer.toneMapping = THREE.NoToneMapping; // 禁用色调映射，保持原始颜色
+        }
         
         // 设置相机位置
         this.camera.position.z = 5;
@@ -87,6 +94,9 @@ class StarField3D {
         // 初始化场景位置和旋转为0（确保完全静态）
         this.scene.position.set(0, 0, 0);
         this.scene.rotation.set(0, 0, 0);
+        
+        // 加载背景图片
+        this.loadBackgroundImage();
         
         console.log('创建星空粒子...');
         // 创建简洁的白色星星
@@ -101,31 +111,105 @@ class StarField3D {
         
         console.log('星空场景初始化完成，星星数量:', this.stars.length);
         console.log('场景对象数量:', this.scene.children.length);
+        console.log('场景子对象详情:');
+        this.scene.children.forEach((child, index) => {
+            console.log(`  对象[${index}]:`, child.type, child);
+        });
         
         // 立即渲染一次，确保可见
         this.renderer.render(this.scene, this.camera);
         console.log('首次渲染完成');
+        console.log('Canvas实际尺寸:', this.canvas.width, 'x', this.canvas.height);
+        console.log('Canvas显示尺寸:', this.canvas.clientWidth, 'x', this.canvas.clientHeight);
+        
+        // 强制再次渲染，确保显示
+        setTimeout(() => {
+            this.renderer.render(this.scene, this.camera);
+            console.log('延迟渲染完成');
+        }, 100);
+    }
+    
+    loadBackgroundImage() {
+        // 首先检查URL参数中是否指定了背景图片路径
+        const urlParams = new URLSearchParams(window.location.search);
+        const customBackground = urlParams.get('background');
+        
+        // 如果URL参数指定了背景图片，直接加载
+        if (customBackground) {
+            const textureLoader = new THREE.TextureLoader();
+            textureLoader.load(
+                customBackground,
+                (texture) => {
+                    console.log('背景图片加载成功:', customBackground);
+                    texture.mapping = THREE.EquirectangularReflectionMapping;
+                    if (texture.encoding !== undefined) {
+                        texture.encoding = THREE.sRGBEncoding;
+                    }
+                    this.scene.background = texture;
+                },
+                undefined,
+                (error) => {
+                    console.warn('背景图片加载失败，使用纯黑背景:', customBackground);
+                }
+            );
+            return;
+        }
+        
+        // 如果没有指定背景图片，使用纯黑背景（不尝试加载，避免404错误）
+        // 如果需要添加背景图片，请将图片放到 assets 目录，命名为 background.jpg 或 background.png
+        // 然后取消下面的注释并修改路径
+        /*
+        const textureLoader = new THREE.TextureLoader();
+        textureLoader.load(
+            'assets/background.jpg',
+            (texture) => {
+                console.log('背景图片加载成功');
+                texture.mapping = THREE.EquirectangularReflectionMapping;
+                if (texture.encoding !== undefined) {
+                    texture.encoding = THREE.sRGBEncoding;
+                }
+                this.scene.background = texture;
+            },
+            undefined,
+            (error) => {
+                console.warn('背景图片加载失败，使用纯黑背景');
+            }
+        );
+        */
     }
     
     createStarField() {
-        // 创建圆形星星纹理
+        // 创建纯白色圆形星星纹理
         const createStarTexture = () => {
             const canvas = document.createElement('canvas');
             canvas.width = 64;
             canvas.height = 64;
             const ctx = canvas.getContext('2d');
             
-            // 创建径向渐变，中心亮，边缘透明
+            // 先填充黑色背景，确保没有其他颜色
+            ctx.fillStyle = 'rgba(0, 0, 0, 0)';
+            ctx.fillRect(0, 0, 64, 64);
+            
+            // 创建径向渐变，中心亮，边缘透明，确保纯白色
             const gradient = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
             gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
+            gradient.addColorStop(0.3, 'rgba(255, 255, 255, 1)');
             gradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.8)');
             gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
             
             ctx.fillStyle = gradient;
-            ctx.fillRect(0, 0, 64, 64);
+            ctx.beginPath();
+            ctx.arc(32, 32, 32, 0, Math.PI * 2);
+            ctx.fill();
             
             const texture = new THREE.CanvasTexture(canvas);
             texture.needsUpdate = true;
+            // 确保纹理格式正确，避免颜色失真
+            texture.format = THREE.RGBAFormat;
+            // r128版本使用encoding而不是colorSpace
+            if (texture.encoding !== undefined) {
+                texture.encoding = THREE.sRGBEncoding;
+            }
             return texture;
         };
         
@@ -147,16 +231,17 @@ class StarField3D {
         
         starGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
         
-        // 白色星星材质，使用圆形纹理
+        // 纯白色星星材质，确保没有其他颜色
         const starMaterial = new THREE.PointsMaterial({
             color: 0xffffff, // 纯白色
-            size: 2, // 星星大小
+            size: 1, // 星星大小
             map: createStarTexture(), // 使用圆形纹理
             transparent: true,
             opacity: 0.9,
             sizeAttenuation: true,
             depthWrite: false,
-            alphaTest: 0.1 // 优化透明渲染
+            alphaTest: 0.1, // 优化透明渲染
+            vertexColors: false // 禁用顶点颜色，确保使用材质颜色
         });
         
         const stars = new THREE.Points(starGeometry, starMaterial);
@@ -506,29 +591,37 @@ class StarField3D {
         // 不进行任何自动旋转
         
         // 简单的星星闪烁效果
-        this.stars.forEach((starGroup) => {
-            if (starGroup && starGroup.material) {
-                // 轻微的闪烁效果
-                starGroup.material.opacity = 0.7 + Math.sin(Date.now() * 0.001) * 0.2;
-            }
-        });
+        if (this.stars && this.stars.length > 0) {
+            this.stars.forEach((starGroup) => {
+                if (starGroup && starGroup.material) {
+                    // 轻微的闪烁效果
+                    starGroup.material.opacity = 0.7 + Math.sin(Date.now() * 0.001) * 0.2;
+                }
+            });
+        }
         
         // 星座发光效果
-        this.constellations.forEach(constellation => {
-            if (constellation && constellation.children) {
-                constellation.children.forEach(child => {
-                    if (child && child.children && child.children.length > 0) {
-                        const glow = child.children[0];
-                        if (glow && glow.material) {
-                            glow.material.opacity = 0.5 + Math.sin(Date.now() * 0.0015 + child.position.x) * 0.25;
+        if (this.constellations && this.constellations.length > 0) {
+            this.constellations.forEach(constellation => {
+                if (constellation && constellation.children) {
+                    constellation.children.forEach(child => {
+                        if (child && child.children && child.children.length > 0) {
+                            const glow = child.children[0];
+                            if (glow && glow.material) {
+                                glow.material.opacity = 0.5 + Math.sin(Date.now() * 0.0015 + child.position.x) * 0.25;
+                            }
                         }
-                    }
-                });
-            }
-        });
+                    });
+                }
+            });
+        }
         
         // 确保渲染（无论是否有交互都要渲染）
-        this.renderer.render(this.scene, this.camera);
+        if (this.renderer && this.scene && this.camera) {
+            this.renderer.render(this.scene, this.camera);
+        } else {
+            console.warn('渲染器、场景或相机未初始化');
+        }
     }
 
     onWindowResize() {
