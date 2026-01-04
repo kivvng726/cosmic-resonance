@@ -38,6 +38,17 @@
             }
         }, 3000);
     </script>
+    <!-- 后端 API 配置 -->
+    <script>
+        // 配置后端 API 地址
+        // 开发环境使用 localhost，生产环境需要替换为实际的后端地址
+        // 部署时，请将下面的 URL 替换为你的 Railway/Render 后端地址
+        const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        window.API_BASE_URL = isDevelopment 
+            ? 'http://localhost:8000' 
+            : 'https://YOUR_BACKEND_URL_HERE'; // 部署时替换为实际后端地址
+        console.log('后端 API 地址:', window.API_BASE_URL);
+    </script>
 </head>
 <body>
     <!-- 加载屏幕 -->

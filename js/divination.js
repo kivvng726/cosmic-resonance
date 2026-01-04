@@ -10,6 +10,9 @@ class DivinationEngine {
             { id: 'step-4', name: '生成专属内容', duration: 2500 }
         ];
         
+        // 后端 API 配置
+        this.apiBaseUrl = window.API_BASE_URL || 'http://localhost:8000';
+        
         this.planetaryData = {
             sun: { name: '太阳', symbol: '☉', influence: '生命力、领导力、自我表达' },
             moon: { name: '月亮', symbol: '☽', influence: '情感、直觉、内在需求' },
@@ -155,33 +158,124 @@ class DivinationEngine {
         }
     }
 
-    showResults() {
+    async showResults() {
         this.isProcessing = false;
         
-        // 生成占卜结果
-        const result = this.generateDivinationResult();
-        
-        // 显示结果
-        this.displayResult(result);
-        
-        // 切换到结果界面
-        this.switchToSection('result');
+        try {
+            // 生成占卜结果（异步）
+            const result = await this.generateDivinationResult();
+            
+            // 显示结果
+            this.displayResult(result);
+            
+            // 切换到结果界面
+            this.switchToSection('result');
+        } catch (error) {
+            console.error('显示结果时出错:', error);
+            this.showError('生成占卜结果时出现错误，请重试');
+        }
     }
 
-    generateDivinationResult() {
+    async generateDivinationResult() {
         const birthDate = document.getElementById('birth-date').value;
         const question = document.getElementById('question').value;
         
-        // 根据生日计算星座等信息
+        try {
+            // 调用后端 API
+            const response = await fetch(`${this.apiBaseUrl}/api/divination/start`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    birth_date: birthDate,
+                    question: question
+                })
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const result = await response.json();
+            
+            if (result.success && result.data) {
+                // 转换后端数据格式为前端需要的格式
+                return this.formatBackendResult(result.data, birthDate, question);
+            } else {
+                throw new Error(result.error || '占卜失败');
+            }
+        } catch (error) {
+            console.error('API 调用失败，使用本地模拟:', error);
+            // 如果 API 调用失败，回退到本地模拟
+            return this.generateLocalResult(birthDate, question);
+        }
+    }
+    
+    formatBackendResult(data, birthDate, question) {
+        // 将后端返回的数据格式转换为前端显示需要的格式
+        const astronomyData = data.astronomy_data || {};
+        const culturalData = data.cultural_data || {};
+        const finalReading = data.final_reading || '';
+        
+        // 提取信息
+        const sunSign = astronomyData.sun_sign || '';
+        const retrograde = astronomyData.retrograde || [];
+        const fortuneStick = culturalData.fortune_stick || {};
+        const poem = fortuneStick.poem || '';
+        
+        // 构建相位信息
+        let aspects = '';
+        if (retrograde.length > 0) {
+            const planetNames = {
+                'Mercury': '水星 ☿',
+                'Venus': '金星 ♀',
+                'Mars': '火星 ♂',
+                'Jupiter': '木星 ♃',
+                'Saturn': '土星 ♄'
+            };
+            const retrogradeCn = retrograde.map(p => planetNames[p] || p).join('、');
+            aspects = `${retrogradeCn} 逆行`;
+        }
+        
+        // 计算本地信息（用于兼容现有显示逻辑）
         const birthInfo = this.calculateBirthInfo(birthDate);
         
-        // 随机选择一个解读模板
+        return {
+            text: finalReading || this.generateDefaultReading(sunSign, culturalData, question),
+            aspects: aspects || '星象平稳',
+            fortune: poem || '星河璀璨照前程，智慧如光破迷津',
+            birthInfo: birthInfo,
+            focusArea: this.extractFocusArea(question),
+            astronomyData: astronomyData,
+            culturalData: culturalData,
+            rawReading: finalReading
+        };
+    }
+    
+    generateDefaultReading(sunSign, culturalData, question) {
+        const ziweiStar = culturalData?.ziwei_star || '';
+        return `根据您的出生信息，您的太阳星座是${sunSign}，紫微主星是${ziweiStar}。针对您关于"${this.extractFocusArea(question)}"的问题，建议您保持开放心态，把握时机，融合东西方的智慧。`;
+    }
+    
+    extractFocusArea(question) {
+        if (question.includes('事业') || question.includes('工作')) {
+            return '事业发展';
+        } else if (question.includes('感情') || question.includes('爱情')) {
+            return '感情运势';
+        } else if (question.includes('财运') || question.includes('投资')) {
+            return '财富运势';
+        } else if (question.includes('健康')) {
+            return '健康状况';
+        }
+        return '综合运势';
+    }
+    
+    generateLocalResult(birthDate, question) {
+        // 本地模拟结果（作为后备方案）
+        const birthInfo = this.calculateBirthInfo(birthDate);
         const template = this.sampleReadings[Math.floor(Math.random() * this.sampleReadings.length)];
-        
-        // 个性化处理
-        const personalizedReading = this.personalizeReading(template, birthInfo, question);
-        
-        return personalizedReading;
+        return this.personalizeReading(template, birthInfo, question);
     }
 
     calculateBirthInfo(birthDate) {
@@ -253,10 +347,18 @@ class DivinationEngine {
     }
 
     displayResult(result) {
-        // 显示占卜文本
+        // 显示占卜文本（优先使用 rawReading，如果没有则使用 text）
         const readingElement = document.getElementById('divination-reading');
         if (readingElement) {
-            this.typewriterEffect(readingElement, result.text);
+            const displayText = result.rawReading || result.text;
+            // 如果是 Markdown 格式，需要简单处理
+            if (result.rawReading && result.rawReading.includes('#')) {
+                // 简单的 Markdown 转 HTML（可以后续使用专门的库）
+                const htmlText = this.simpleMarkdownToHtml(displayText);
+                readingElement.innerHTML = htmlText;
+            } else {
+                this.typewriterEffect(readingElement, displayText);
+            }
         }
 
         // 显示行星相位
@@ -475,6 +577,32 @@ class DivinationEngine {
                 // 忽略音频播放错误
             });
         }
+    }
+    
+    simpleMarkdownToHtml(markdown) {
+        // 简单的 Markdown 转 HTML（用于显示后端返回的 Markdown 格式解读）
+        let html = markdown;
+        
+        // 标题
+        html = html.replace(/^### (.*$)/gim, '<h3>$1</h3>');
+        html = html.replace(/^## (.*$)/gim, '<h2>$1</h2>');
+        html = html.replace(/^# (.*$)/gim, '<h1>$1</h1>');
+        
+        // 粗体
+        html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+        
+        // 换行
+        html = html.replace(/\n\n/g, '</p><p>');
+        html = html.replace(/\n/g, '<br>');
+        
+        // 引用
+        html = html.replace(/^> (.*$)/gim, '<blockquote>$1</blockquote>');
+        
+        // 列表
+        html = html.replace(/^\d+\. (.*$)/gim, '<li>$1</li>');
+        html = html.replace(/(<li>.*<\/li>)/s, '<ol>$1</ol>');
+        
+        return '<p>' + html + '</p>';
     }
 }
 

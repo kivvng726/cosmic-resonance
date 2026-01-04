@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: cosmic-resonance-backend
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_BASE_URL
+        value: https://api.moonshot.cn/v1
+      - key: OPENAI_MODEL
+        value: moonshot-v1-8k
+      - key: API_HOST
+        value: 0.0.0.0
+

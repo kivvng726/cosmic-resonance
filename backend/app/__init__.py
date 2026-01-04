@@ -1,0 +1,2 @@
+# Cosmic Resonance Backend Application
+
