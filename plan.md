@@ -204,3 +204,123 @@ class GraphState(TypedDict):
 - `backend/requirements.txt`
 - `backend/.env.example`
 - `backend/README.md`
+
+# LangGraph 多 Agent 占卜引擎实现进展报告
+
+## 一、项目概述
+本项目基于 LangGraph 框架构建了一个多 Agent 占卜系统，融合西方占星术与中国传统命理文化，为用户提供个性化的占卜解读。系统采用前后端分离架构，后端通过 FastAPI 提供 RESTful API 服务，前端通过 HTTP 请求与后端交互。
+
+## 二、已完成的核心功能
+
+### 1. 后端项目结构
+已创建完整的 Python 后端目录结构，确保代码组织清晰、模块化。
+
+```
+backend/
+├── app/
+│   ├── __init__.py
+│   ├── main.py                 # FastAPI 主应用
+│   ├── agents/
+│   │   ├── __init__.py
+│   │   ├── astronomer.py       # Agent 1: 天文学家
+│   │   ├── sage.py             # Agent 2: 国学大师
+│   │   └── oracle.py           # Agent 3: 寰宇占卜师
+│   ├── graph/
+│   │   ├── __init__.py
+│   │   ├── state.py            # GraphState 定义
+│   │   └── workflow.py         # LangGraph 工作流
+│   ├── utils/
+│   │   ├── __init__.py
+│   │   ├── astronomy.py        # 天文计算工具
+│   │   ├── chinese_calendar.py # 中国传统历法工具
+│   │   └── prompts.py          # Prompt 模板
+│   └── models/
+│       ├── __init__.py
+│       └── schemas.py          # Pydantic 数据模型
+├── requirements.txt
+└── .env.example
+```
+
+### 2. GraphState 定义
+已在 `backend/app/graph/state.py` 中定义了 LangGraph 工作流的共享状态结构，确保数据在 Agent 间的安全传递和类型检查。
+
+```python
+from typing import TypedDict, Optional, Dict, Any
+
+class GraphState(TypedDict):
+    user_input: Dict[str, Any]
+    astronomy_data: Optional[Dict[str, Any]]
+    cultural_data: Optional[Dict[str, Any]]
+    final_reading: Optional[str]
+    current_agent: str
+    messages: list
+```
+
+### 3. 三个 Agent 实现
+
+#### 3.1 Astronomer (天文学家)
+- 功能：计算天文数据（星座、月相、行星逆行等）
+- 输出：包含太阳星座、上升星座、月亮盈亏、行星逆行状态的 JSON 数据及自然语言描述
+- 路径：`backend/app/agents/astronomer.py`
+
+#### 3.2 Sage (国学大师)
+- 功能：计算传统文化数据（八字、紫微、签文等）
+- 输出：包含八字属性、紫微主星、灵签及五行建议的 JSON 数据
+- 路径：`backend/app/agents/sage.py`
+
+#### 3.3 Oracle (寰宇占卜师)
+- 功能：综合解读生成，融合东西方元素
+- 输出：Markdown 格式的个性化占卜解读
+- 路径：`backend/app/agents/oracle.py`
+
+### 4. LangGraph 工作流
+已在 `backend/app/graph/workflow.py` 中构建了线性工作流，管理 Agent 执行顺序：
+- 入口节点：接收用户输入，初始化 GraphState
+- Astronomer 节点：执行天文计算
+- Sage 节点：执行传统文化计算
+- Oracle 节点：综合解读（依赖前两个 Agent 的输出）
+- 结束节点：返回最终结果
+
+### 5. FastAPI 后端服务
+已在 `backend/app/main.py` 中实现了 REST API 端点：
+- `POST /api/divination/start`: 启动占卜流程
+- `GET /api/divination/status/{session_id}`: 查询占卜状态（可选，用于异步处理）
+- `POST /api/health`: 健康检查
+
+### 6. 工具函数
+已实现以下工具函数：
+- 天文计算工具：`backend/app/utils/astronomy.py`
+- 中国传统历法工具：`backend/app/utils/chinese_calendar.py`
+- Prompt 模板：`backend/app/utils/prompts.py`
+
+### 7. 前端集成
+已修改 `js/divination.js`，集成后端 API 调用：
+- 将 `generateDivinationResult()` 方法改为调用后端 API
+- 保持现有的 UI 交互逻辑不变
+- 添加 API 调用错误处理
+
+### 8. 依赖和配置
+已创建所有必要的配置文件：
+- `requirements.txt`: 项目依赖列表
+- `.env.example`: 环境变量示例
+- `backend/README.md`: 项目文档（Markdown 格式）
+
+## 三、下一步计划
+
+### 1. 测试与优化
+- 对每个 Agent 进行单元测试，确保功能正确性
+- 对整个工作流进行集成测试，确保 Agent 间协作顺畅
+- 优化性能，减少 API 响应时间
+
+### 2. 功能扩展
+- 添加更多占卜类型（如塔罗牌、占星骰子等）
+- 实现用户认证和个性化设置
+- 添加历史记录功能，方便用户查看过往占卜结果
+
+### 3. 部署与上线
+- 配置生产环境，部署后端服务
+- 优化前端性能，提升用户体验
+- 监控系统运行状态，及时处理异常
+
+## 四、总结
+本项目已完成核心功能的开发，包括后端项目结构搭建、GraphState 定义、三个 Agent 实现、LangGraph 工作流构建、FastAPI 后端服务实现、工具函数开发、前端集成以及依赖和配置文件创建。下一步将重点进行测试与优化、功能扩展以及部署与上线工作，确保系统稳定运行并提供良好的用户体验。
